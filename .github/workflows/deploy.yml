@@ -1,0 +1,40 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code
+name: Deploy to cloud
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{github.workflow}}-${{github.ref}}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Application build
+        env:
+          VITE_MEDUSA_BASE: /
+          VITE_MEDUSA_STOREFRONT_URL: https://shop.pinnaclesystems.co.in
+          VITE_MEDUSA_BACKEND_URL: https://backend.shop.pinnaclesystems.co.in
+        run: yarn build:preview
+
+      - name: Deploy to VPS
+        uses: easingthemes/ssh-deploy@v5.1.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: '-az --delete --stats'
+          SOURCE: dist/
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET: ${{ secrets.REMOTE_TARGET }}/vendor-panel/
